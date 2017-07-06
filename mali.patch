@@ -7,7 +7,7 @@ This is better than just building the module externally
 
 Signed-off-by: Remilia Scarlet <remilia.1505@gmail.com>
 ---
- arch/arm/configs/apias_defconfig                   |   11 +
+ arch/arm/configs/blackL_defconfig                   |   11 +
  drivers/Kconfig                                    |    2 +
  drivers/gpu/Makefile                               |    2 +
  drivers/gpu/mali400/Kconfig                        |   25 +
@@ -300,10 +300,10 @@ Signed-off-by: Remilia Scarlet <remilia.1505@gmail.com>
  create mode 100755 drivers/gpu/mali400/r4p1/timestamp-default/mali_timestamp.c
  create mode 100755 drivers/gpu/mali400/r4p1/timestamp-default/mali_timestamp.h
 
-diff --git a/arch/arm/configs/apias_defconfig b/arch/arm/configs/apias_defconfig
+diff --git a/arch/arm/configs/blackL_defconfig b/arch/arm/configs/blackL_defconfig
 index f760438b..e5ade39f 100755
---- a/arch/arm/configs/apias_defconfig
-+++ b/arch/arm/configs/apias_defconfig
+--- a/arch/arm/configs/blackL_defconfig
++++ b/arch/arm/configs/blackL_defconfig
 @@ -1066,6 +1066,17 @@ CONFIG_CMA_AREAS=7
  #
  # Bus devices

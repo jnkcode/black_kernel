@@ -96,6 +96,8 @@ enum {
 	SPRD_CODEC_ADCLHEADPHONE_R_SET,
 	SPRD_CODEC_ADCRHEADPHONE_L_SET,
 	SPRD_CODEC_ADCRHEADPHONE_R_SET,
+    SPRD_CODEC_HPLCG_L_SET,
+    SPRD_CODEC_HPRCG_R_SET,
 	SPRD_CODEC_ADC_END,
 };
 
@@ -138,6 +140,8 @@ enum {
 	SPRD_CODEC_PGA_CG_HPR_1,
 	SPRD_CODEC_PGA_CG_HPL_2,
 	SPRD_CODEC_PGA_CG_HPR_2,
+	SPRD_CODEC_PGA_HPL_CGL,
+	SPRD_CODEC_PGA_HPR_CGR,
 
 	SPRD_CODEC_PGA_END
 };
@@ -163,6 +167,8 @@ static const char *sprd_codec_pga_debug_str[SPRD_CODEC_PGA_MAX] = {
 	"CG_HPR_1",
 	"CG_HPL_2",
 	"CG_HPR_2",
+	"HPL_CGL",
+	"HPR_CGR",
 };
 
 typedef int (*sprd_codec_pga_set) (struct snd_soc_codec * codec, int pgaval);
@@ -397,6 +403,7 @@ struct sprd_codec_priv {
 	int sprd_linein_mute;
 	int sprd_linein_speaker_mute;
 	int sprd_linein_headphone_mute;
+	int sprd_linein_hpcg_mute;
 	int sprd_linein_set;
 	int sprd_linein_speaker_set;
 	int sprd_linein_headphone_set;
@@ -747,6 +754,62 @@ static int sprd_codec_pga_cg_hpl_1_set(struct snd_soc_codec *codec, int pgaval)
 	return snd_soc_update_bits(codec, SOC_REG(reg), mask, val);
 }
 
+static int sprd_codec_pga_hpl_cgl_set(struct snd_soc_codec *codec, int pgaval)
+{
+	int reg, val, mask;
+	sp_asoc_pr_info("%s E \n",__func__);
+	reg = ANA_CDC7;
+	mask = 1 << HPL_CGL;
+	val = (pgaval << HPL_CGL) & mask;
+	return snd_soc_update_bits(codec, SOC_REG(reg), mask, val);
+}
+
+static int sprd_codec_pga_hpr_cgr_set(struct snd_soc_codec *codec, int pgaval)
+{
+	int reg, val, mask;
+	sp_asoc_pr_info("%s E \n",__func__);
+	reg = ANA_CDC7;
+	mask = 1 << HPR_CGR;
+	val = (pgaval << HPR_CGR) & mask;
+	return snd_soc_update_bits(codec, SOC_REG(reg), mask, val);
+}
+
+static int _switch_hpl_cgl(struct snd_soc_codec *codec, int pgaval)
+{
+	int ret = 0;
+	struct sprd_codec_priv *sprd_codec = snd_soc_codec_get_drvdata(codec);
+	sp_asoc_pr_info("%s switch %s mute:%d \n",__func__,pgaval ? "on":"off",sprd_codec->sprd_linein_headphone_mute);
+	mutex_lock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	if (pgaval) {
+			sprd_codec->sprd_linein_headphone_set |= BIT(SPRD_CODEC_HPLCG_L_SET);
+	} else {
+			sprd_codec->sprd_linein_headphone_set &= ~(BIT(SPRD_CODEC_HPLCG_L_SET));
+	}
+	if ((!sprd_codec->sprd_linein_hpcg_mute)) {
+		ret = sprd_codec_pga_hpl_cgl_set(codec,pgaval);
+	}
+	mutex_unlock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	return ret;
+}
+
+static int _switch_hpr_cgr(struct snd_soc_codec *codec, int pgaval)
+{
+	int ret = 0;
+	struct sprd_codec_priv *sprd_codec = snd_soc_codec_get_drvdata(codec);
+	sp_asoc_pr_info("%s switch %s mute:%d \n",__func__,pgaval ? "on":"off",sprd_codec->sprd_linein_headphone_mute);
+	mutex_lock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	if (pgaval) {
+			sprd_codec->sprd_linein_headphone_set |= BIT(SPRD_CODEC_HPRCG_R_SET);
+	} else {
+			sprd_codec->sprd_linein_headphone_set &= ~(BIT(SPRD_CODEC_HPRCG_R_SET));
+	}
+	if ((!sprd_codec->sprd_linein_hpcg_mute)) {
+		ret = sprd_codec_pga_hpr_cgr_set(codec,pgaval);
+	}
+	mutex_unlock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	return ret;
+}
+
 static int sprd_codec_pga_cg_hpr_1_set(struct snd_soc_codec *codec, int pgaval)
 {
 	int reg, val, mask;
@@ -795,6 +858,8 @@ static struct sprd_codec_pga sprd_codec_pga_cfg[SPRD_CODEC_PGA_MAX] = {
 	{sprd_codec_pga_cg_hpr_1_set, -1},
 	{sprd_codec_pga_cg_hpl_2_set, -1},
 	{sprd_codec_pga_cg_hpr_2_set, -1},
+	{_switch_hpl_cgl, 0},
+	{_switch_hpr_cgr, 0},
 };
 
 static void _mixer_adc_linein_mute_nolock(struct snd_soc_codec *codec, int need_mute)
@@ -847,7 +912,18 @@ static void _mixer_linein_headphone_mute_nolock(struct snd_soc_codec *codec, int
 		snd_soc_update_bits(codec, SOC_REG(ANA_CDC7), BIT(ADCR_P_HPR), val << ADCR_P_HPR);
 	}
 }
-
+static void _mixer_linein_hpcg_mute_nolock(struct snd_soc_codec *codec, int need_mute)
+{
+	int val = 0;
+	val = !need_mute;
+	struct sprd_codec_priv *sprd_codec = snd_soc_codec_get_drvdata(codec);
+	if (sprd_codec->sprd_linein_headphone_set & BIT(SPRD_CODEC_HPLCG_L_SET)) {
+		snd_soc_update_bits(codec, SOC_REG(ANA_CDC7), BIT(HPL_CGL), val << HPL_CGL);
+	}
+	if (sprd_codec->sprd_linein_headphone_set & BIT(SPRD_CODEC_HPRCG_R_SET)) {
+		snd_soc_update_bits(codec, SOC_REG(ANA_CDC7), BIT(HPR_CGR), val << HPR_CGR);
+	}
+}
 static int _mixer_adc_linein_set(struct snd_soc_codec *codec, int id, unsigned int mask,
 			    int on, unsigned int shift)
 {
@@ -1269,6 +1345,8 @@ static inline void sprd_codec_linein_mute_init(struct sprd_codec_priv *sprd_code
 	sprd_codec->sprd_linein_speaker_set = 0;
 	sprd_codec->sprd_linein_headphone_mute = 0;
 	sprd_codec->sprd_linein_headphone_set = 0;
+	sprd_codec->pga[SPRD_CODEC_PGA_HPL_CGL].pgaval = 0x1;
+	sprd_codec->pga[SPRD_CODEC_PGA_HPR_CGR].pgaval = 0x1;
 	mutex_init(&sprd_codec->sprd_linein_speaker_mute_mutex);
 }
 
@@ -3228,12 +3306,12 @@ static const struct snd_soc_dapm_widget sprd_codec_dapm_widgets[] = {
 			   0, 0,
 			   spk_pa_event,
 			   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_PGA_S("HPL CGL Switch", SPRD_CODEC_HP_PA_POST_ORDER, SOC_REG(ANA_CDC7),
-			   HPL_CGL, 0, NULL,
-			   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_PGA_S("HPR CGR Switch", SPRD_CODEC_HP_PA_POST_ORDER, SOC_REG(ANA_CDC7),
-			   HPR_CGR, 0, NULL,
-			   SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_PGA_S("HPL CGL Switch", SPRD_CODEC_HP_PA_POST_ORDER, FUN_REG(SPRD_CODEC_PGA_HPL_CGL),
+			   HPL_CGL, 0, pga_event,
+			   SND_SOC_DAPM_PRE_PMU |SND_SOC_DAPM_PRE_PMD),
+	SND_SOC_DAPM_PGA_S("HPR CGR Switch", SPRD_CODEC_HP_PA_POST_ORDER, FUN_REG(SPRD_CODEC_PGA_HPR_CGR),
+			   HPR_CGR, 0, pga_event,
+			   SND_SOC_DAPM_PRE_PMU |SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_PGA_S("HPL CG Mute1", SPRD_CODEC_CG_PGA_ORDER, FUN_REG(SPRD_CODEC_PGA_CG_HPL_1),
 	           0, 0,
 			   pga_event,
@@ -3723,7 +3801,53 @@ static int sprd_codec_linein_headphone_mute_get(struct snd_kcontrol *kcontrol,
 	}
 	return 0;
 }
+static int sprd_codec_linein_hpcg_mute_put(struct snd_kcontrol *kcontrol,
+				      struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+	    (struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct sprd_codec_priv *sprd_codec = snd_soc_codec_get_drvdata(codec);
+	int max = mc->max;
+	unsigned int mask = (1 << fls(max)) - 1;
+	unsigned int invert = mc->invert;
+	unsigned int val;
+	int ret = 0;
+	
+	sp_asoc_pr_info("%s, 0x%08x\n",
+		__func__,(int)ucontrol->value.integer.value[0]);
 
+	val = (ucontrol->value.integer.value[0] & mask);
+	if (invert)
+		val = max - val;
+	mutex_lock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	sprd_codec->sprd_linein_hpcg_mute = (u32) val;
+	if (sprd_codec->sprd_linein_headphone_set) {
+		_mixer_linein_hpcg_mute_nolock(codec, sprd_codec->sprd_linein_hpcg_mute);
+	}
+	mutex_unlock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	return ret;
+}
+
+static int sprd_codec_linein_hpcg_mute_get(struct snd_kcontrol *kcontrol,
+				      struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+	    (struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct sprd_codec_priv *sprd_codec = snd_soc_codec_get_drvdata(codec);
+	int max = mc->max;
+	unsigned int invert = mc->invert;
+
+	mutex_lock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	ucontrol->value.integer.value[0] = sprd_codec->sprd_linein_hpcg_mute;
+	mutex_unlock(&sprd_codec->sprd_linein_speaker_mute_mutex);
+	if (invert) {
+		ucontrol->value.integer.value[0] =
+		    max - ucontrol->value.integer.value[0];
+	}
+	return 0;
+}
 static int sprd_codec_inter_hp_pa_put(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
@@ -3924,7 +4048,8 @@ static const struct snd_kcontrol_new sprd_codec_snd_controls[] = {
 		       sprd_codec_linein_speaker_mute_get, sprd_codec_linein_speaker_mute_put),
 	SOC_SINGLE_EXT("Linein Headphone Mute Switch", 0, 0, 1, 0,
 		       sprd_codec_linein_headphone_mute_get, sprd_codec_linein_headphone_mute_put),
-
+	SOC_SINGLE_EXT("Linein hpcg Mute Switch", 0, 0, 1, 0,
+		       sprd_codec_linein_hpcg_mute_get, sprd_codec_linein_hpcg_mute_put),
 	SOC_ENUM_EXT("Aud Codec Info", codec_info_enum,
 			   sprd_codec_info_get, sprd_codec_info_put),
 };

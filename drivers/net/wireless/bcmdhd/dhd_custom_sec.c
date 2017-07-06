@@ -308,6 +308,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"LY", "LI", 4},
 	{"BO", "NG", 0},
 	{"UM", "PR", 38},
+	{"CU", "US", 0},
 #endif /* default ccode/regrev */
 };
 
