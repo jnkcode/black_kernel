@@ -1,11 +1,11 @@
 */DEVICE INFO/*
-Device Name : Samsung Galaxy Ace4/S Dous 3
-Device Model : SM-G316HU
+Device Name : Samsung Galaxy Ace4
+Device Model : SM-G318
 Device Chipset : SC8830
 
 */Source Info/*
-Kernel Version : 3.10.x
-Defconfig : apias_defconfig
+Kernel Version : 3.10.17
+Defconfig : black_defconfig
 
 */How To Compile/*
 ---------------
@@ -13,18 +13,17 @@ Requirements
 ---------------
 1.Linux 64bit (idk about 32bit )
 2.Tools To compile kernel
-3.arm-ebi uberTC-4.9 toolchain (https://github.com/Parthib24/armebi-4.9-toolchain)
+3.arm-ebi uberTC-4.9 toolchain (https://github.com/carlosgallego98/armebi-4.9-toolchain)
 
 ---------------
 
-1. git clone https://github.com/Parthib24/apias_kernel
+1. git clone https://github.com/carlosgallego98/black_kernel
 
 2. cd apias_kernel
 
 3. chmod 755 build.sh
 
 4. ./build.sh
-   press 1 or 2 on the keybord
+   press 2 or 4 on the keybord
 
-
-zImage output folder : apias_kernel/arch/arm/boot
+zImage output folder : black_kernel/arch/arm/boot
